@@ -1,174 +1,166 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
-  <meta charset="UTF-8">
-  <title>換匯比較工具</title>
-  <style>
-    body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
-    .field { margin-bottom: 1.2rem; }
-    label { display: block; font-weight: bold; margin-bottom: 0.5rem; }
-    input { width: 100%; padding: 0.5rem; font-size: 1rem; }
-    button { margin-top: 1.2rem; padding: 0.75rem; width: 100%; font-size: 1.1rem; cursor: pointer; }
-    .result, .history { margin-top: 2rem; font-size: 1rem; background: #f9f9f9; padding: 1rem; border-radius: 0.5rem; }
-    .history-entry { margin-bottom: 1rem; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
-    .btn-group { display: flex; gap: 0.5rem; margin-top: 1rem; }
-    .btn-group button { flex: 1; }
-  </style>
+    <meta charset="UTF-8">
+    <title>換日圓比較工具</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            max-width: 600px;
+            margin: auto;
+        }
+
+        label {
+            display: block;
+            margin-top: 1rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1.2rem;
+        }
+
+        button {
+            flex: 1;
+            padding: 0.75rem;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .result,
+        .history {
+            margin-top: 2rem;
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+
+        .history {
+            font-size: 0.9rem;
+        }
+    </style>
 </head>
+
 <body>
-  <h2>換匯比較工具</h2>
+    <h2>換日圓比較工具（固定目標金額）</h2>
 
-  <div class="field">
-    <label for="targetJPY">你想要兌換的日圓金額（JPY）</label>
-    <input type="number" id="targetJPY" value="100000">
-  </div>
+    <label>你想要兌換的日圓金額（JPY）
+        <input type="number" id="targetJPY" value="100000">
+    </label>
+    <label>1 美元 = 幾日圓（USD/JPY）
+        <input type="number" id="usdjpy" value="146">
+    </label>
+    <label>目前 1 美元 = 幾台幣（TWD/USD，現值）
+        <input type="number" id="currentTwdusd" value="33">
+    </label>
+    <label>你先前持有美金的換匯成本（TWD/USD 匯率）
+        <input type="number" id="pastTwdusd" value="32.9691">
+    </label>
+    <label>備註（可選填）
+        <input type="text" id="note" placeholder="例如：旅行用、薪水換匯等">
+    </label>
 
-  <div class="field">
-    <label for="usdjpy">1 美元 = 幾日圓（USD/JPY）</label>
-    <input type="number" id="usdjpy" value="146">
-  </div>
+    <div class="buttons">
+        <button onclick="calculateJPYTargetComparison()">立即比較</button>
+        <button onclick="downloadHistory()">📁 下載匯率記錄 (.txt)</button>
+        <button onclick="downloadCSV()">📊 匯出 CSV</button>
+        <button onclick="clearHistory()">🗑️ 清除歷史記錄</button>
+    </div>
 
-  <div class="field">
-    <label for="currentTwdusd">目前 1 美元 = 幾台幣（TWD/USD，現值）</label>
-    <input type="number" id="currentTwdusd" value="33">
-  </div>
+    <div class="result" id="result"></div>
+    <div class="history" id="history"></div>
 
-  <div class="field">
-    <label for="pastTwdusd">你先前持有美金的換匯成本（TWD/USD 匯率）</label>
-    <input type="number" id="pastTwdusd" value="32.9691">
-  </div>
+    <script>
+        let historyLog = JSON.parse(localStorage.getItem("fxHistory") || "[]");
 
-  <div class="field">
-    <label for="note">備註（可選填）</label>
-    <input type="text" id="note" placeholder="例如：旅行用、薪水換匯等">
-  </div>
+        function updateHistoryDisplay() {
+            document.getElementById('history').innerHTML = "<strong>📅 匯率記錄</strong><br>" +
+                (historyLog.length ? historyLog.map(item => item.text).join("<br>") : "尚無記錄");
+        }
 
-  <button onclick="calculateAndSend()">立即比較</button>
-  <div class="result" id="result"></div>
+        function calculateJPYTargetComparison() {
+            const targetJPY = parseFloat(document.getElementById('targetJPY').value);
+            const usdjpy = parseFloat(document.getElementById('usdjpy').value);
+            const currentTwdusd = parseFloat(document.getElementById('currentTwdusd').value);
+            const pastTwdusd = parseFloat(document.getElementById('pastTwdusd').value);
+            const note = document.getElementById('note').value;
 
-  <div class="btn-group">
-    <button onclick="downloadHistory('txt')">匯出 TXT</button>
-    <button onclick="downloadHistory('csv')">匯出 CSV</button>
-    <button onclick="clearHistory()">刪除歷史紀錄</button>
-  </div>
+            if ([targetJPY, usdjpy, currentTwdusd, pastTwdusd].some(v => isNaN(v) || v <= 0)) {
+                alert("請確認所有欄位都有正確填寫且大於0！");
+                return;
+            }
 
-  <div class="history" id="history"></div>
+            const requiredUSD = targetJPY / usdjpy;
+            const costTWD_now = requiredUSD * currentTwdusd;
+            const costTWD_past = requiredUSD * pastTwdusd;
 
-  <script>
-    const endpoint = "https://script.google.com/macros/s/AKfycbxO3gmrR7h06K7f8nsSdZDKB4PlGYrmJaixbJFRzG3W1PNYGtaqU0FqXXpir67-Bn_OHQ/exec";
+            let message = `
+    🎯 目標日圓金額：${targetJPY.toFixed(0)} JPY<br><br>
+    💵【使用現有美元（過去匯率 ${pastTwdusd}）】<br>
+    需要約 ${requiredUSD.toFixed(2)} USD<br>
+    當初成本：約 <strong>${costTWD_past.toFixed(2)} TWD</strong><br><br>
+    💱【現在用台幣換美元再換日圓（匯率 ${currentTwdusd}）】<br>
+    需要約 ${requiredUSD.toFixed(2)} USD<br>
+    現值成本：約 <strong>${costTWD_now.toFixed(2)} TWD</strong><br><br>
+    `;
 
-    function calculateAndSend() {
-      const targetJPY = parseFloat(document.getElementById('targetJPY').value);
-      const usdjpy = parseFloat(document.getElementById('usdjpy').value);
-      const currentTwdusd = parseFloat(document.getElementById('currentTwdusd').value);
-      const pastTwdusd = parseFloat(document.getElementById('pastTwdusd').value);
-      const note = document.getElementById('note').value;
+            if (costTWD_past < costTWD_now)
+                message += "✅ <strong>使用現有美元（舊匯率）換日圓比較划算！</strong>";
+            else if (costTWD_past > costTWD_now)
+                message += "✅ <strong>用現在台幣換美元再換日圓比較划算！</strong>";
+            else
+                message += "⚖️ <strong>兩種方式一樣划算！</strong>";
 
-      if (isNaN(targetJPY) || isNaN(usdjpy) || isNaN(currentTwdusd) || isNaN(pastTwdusd)) {
-        alert("請確認所有欄位都有正確填寫！");
-        return;
-      }
+            document.getElementById('result').innerHTML = message;
 
-      const requiredUSD = targetJPY / usdjpy;
-      const costTWD_now = requiredUSD * currentTwdusd;
-      const costTWD_past = requiredUSD * pastTwdusd;
+            const today = new Date().toISOString().split('T')[0];
+            const textEntry = `${today}｜USD/JPY: ${usdjpy}, TWD/USD(現): ${currentTwdusd}, TWD/USD(舊): ${pastTwdusd}${note ? ｜備註：${note} : ""}`;
+            const csvEntry = `${today},${usdjpy},${currentTwdusd},${pastTwdusd},${note.replace(/,/g, '，')}`;
 
-      let resultMsg = `🎯 目標日圓金額：${targetJPY.toFixed(0)} JPY<br><br>`;
-      resultMsg += `💵【使用現有美元（過去匯率 ${pastTwdusd}）】<br>`;
-      resultMsg += `需要約 ${requiredUSD.toFixed(2)} USD<br>`;
-      resultMsg += `當初成本：約 <strong>${costTWD_past.toFixed(2)} TWD</strong><br><br>`;
-      resultMsg += `💱【現在用台幣換美元再換日圓（匯率 ${currentTwdusd}）】<br>`;
-      resultMsg += `需要約 ${requiredUSD.toFixed(2)} USD<br>`;
-      resultMsg += `現值成本：約 <strong>${costTWD_now.toFixed(2)} TWD</strong><br><br>`;
+            historyLog.unshift({ text: textEntry, csv: csvEntry });
+            if (historyLog.length > 100) historyLog.pop();
+            localStorage.setItem("fxHistory", JSON.stringify(historyLog));
+            updateHistoryDisplay();
+        }
 
-      if (costTWD_past < costTWD_now) {
-        resultMsg += "✅ <strong>使用現有美元（舊匯率）換日圓比較划算！</strong>";
-      } else if (costTWD_past > costTWD_now) {
-        resultMsg += "✅ <strong>用現在台幣換美元再換日圓比較划算！</strong>";
-      } else {
-        resultMsg += "⚖️ <strong>兩種方式一樣划算！</strong>";
-      }
+        function downloadHistory() {
+            if (!historyLog.length) return alert("目前沒有匯率記錄可下載！");
+            const blob = new Blob([historyLog.map(e => e.text).join("\n")], { type: "text/plain;charset=utf-8" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "匯率記錄.txt";
+            link.click();
+        }
 
-      document.getElementById('result').innerHTML = resultMsg;
+        function downloadCSV() {
+            if (!historyLog.length) return alert("目前沒有記錄！");
+            const bom = '\uFEFF';
+            const csv = ["日期,USD/JPY,TWD/USD(現),TWD/USD(舊),備註", ...historyLog.map(e => e.csv)].join("\n");
+            const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "匯率記錄.csv";
+            link.click();
+        }
 
-      const record = {
-        time: new Date().toLocaleString(),
-        usdjpy,
-        currentTwdusd,
-        pastTwdusd,
-        note,
-        result: resultMsg
-      };
+        function clearHistory() {
+            if (!confirm("確定要清除所有匯率記錄嗎？")) return;
+            historyLog = [];
+            localStorage.removeItem("fxHistory");
+            updateHistoryDisplay();
+        }
 
-      saveToHistory(record);
-      renderHistory();
-
-      const query = new URLSearchParams({
-        usdjpy,
-        currentTwdusd,
-        pastTwdusd,
-        note
-      }).toString();
-
-      fetch(endpoint + "?" + query)
-        .then(res => res.text())
-        .then(text => console.log("✅ 同步結果：", text))
-        .catch(err => console.error("❌ 發送失敗：", err));
-    }
-
-    function saveToHistory(data) {
-      const history = JSON.parse(localStorage.getItem('exchangeHistory') || '[]');
-      history.unshift(data);
-      localStorage.setItem('exchangeHistory', JSON.stringify(history.slice(0, 50)));
-    }
-
-    function renderHistory() {
-      const container = document.getElementById('history');
-      const history = JSON.parse(localStorage.getItem('exchangeHistory') || '[]');
-      if (history.length === 0) {
-        container.innerHTML = "尚無歷史紀錄。";
-        return;
-      }
-
-      container.innerHTML = "<strong>📜 歷史紀錄：</strong><br><br>" + history.map(entry => `
-        <div class="history-entry">
-          <div>🕒 ${entry.time}</div>
-          <div>${entry.result}</div>
-          <div>備註：${entry.note || "（無）"}</div>
-        </div>
-      `).join('');
-    }
-
-    function clearHistory() {
-      if (confirm("確定要刪除所有歷史紀錄？")) {
-        localStorage.removeItem('exchangeHistory');
-        renderHistory();
-      }
-    }
-
-    function downloadHistory(format = "txt") {
-      const history = JSON.parse(localStorage.getItem('exchangeHistory') || '[]');
-      if (history.length === 0) {
-        alert("尚無紀錄可匯出");
-        return;
-      }
-
-      const lines = history.map(h => `${h.time}, ${h.usdjpy}, ${h.currentTwdusd}, ${h.pastTwdusd}, ${h.note}`);
-      const content = format === 'csv'
-        ? "時間,USDJPY,現值TWD/USD,過去TWD/USD,備註
-" + lines.join("
-")
-        : lines.join("
-");
-
-      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `exchange-history.${format}`;
-      link.click();
-    }
-
-    renderHistory();
-  </script>
+        updateHistoryDisplay();
+    </script>
 </body>
+
 </html>

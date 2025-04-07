@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <title>換匯比較工具</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            max-width: 600px;
+            margin: auto;
+        }
+
+        .field {
+            margin-bottom: 1.2rem;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 1rem;
+        }
+
+        button {
+            margin-top: 1.2rem;
+            padding: 0.75rem;
+            width: 100%;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .result {
+            margin-top: 2rem;
+            font-size: 1rem;
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>換匯比較工具</h2>
+
+    <div class="field">
+        <label for="targetJPY">你想要兌換的日圓金額（JPY）</label>
+        <input type="number" id="targetJPY" value="100000">
+    </div>
+
+    <div class="field">
+        <label for="usdjpy">1 美元 = 幾日圓（USD/JPY）</label>
+        <input type="number" id="usdjpy" value="146">
+    </div>
+
+    <div class="field">
+        <label for="currentTwdusd">目前 1 美元 = 幾台幣（TWD/USD，現值）</label>
+        <input type="number" id="currentTwdusd" value="33">
+    </div>
+
+    <div class="field">
+        <label for="pastTwdusd">你先前持有美金的換匯成本（TWD/USD 匯率）</label>
+        <input type="number" id="pastTwdusd" value="32.9691">
+    </div>
+
+    <div class="field">
+        <label for="note">備註（可選填）</label>
+        <input type="text" id="note" placeholder="例如：旅行用、薪水換匯等">
+    </div>
+
+    <button onclick="calculateAndSend()">立即比較</button>
+    <div class="result" id="result"></div>
+
+    <script>
+        function calculateAndSend() {
+            const targetJPY = parseFloat(document.getElementById('targetJPY').value);
+            const usdjpy = parseFloat(document.getElementById('usdjpy').value);
+            const currentTwdusd = parseFloat
